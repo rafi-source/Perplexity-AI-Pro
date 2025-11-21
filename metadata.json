@@ -1,0 +1,5 @@
+{
+  "name": "Perplexica-Lite",
+  "description": "A frontend-only implementation of the Perplexica AI search engine concept, powered by Google Gemini with Search Grounding to provide cited answers.",
+  "requestFramePermissions": []
+}
