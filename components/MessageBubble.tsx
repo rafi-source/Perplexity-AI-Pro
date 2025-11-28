@@ -1,15 +1,17 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '../types';
-import { User, Sparkles, Layers, Zap } from 'lucide-react';
+import { User, Sparkles, Layers, Zap, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { SourceCard } from './SourceCard';
 import { ThinkingProcess } from './ThinkingProcess';
+import { CodeBlock } from './CodeBlock';
 
 interface MessageBubbleProps {
   message: Message;
+  onFeedback: (messageId: string, feedback: 'like' | 'dislike') => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onFeedback }) => {
   const isUser = message.role === 'user';
   const isPro = message.isProMode;
 
@@ -75,7 +77,39 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         {/* Text Content */}
         {(!message.isThinking || (message.content && message.content.length > 0)) && (
           <div className="prose prose-invert prose-zinc max-w-none prose-a:text-cyan-400 prose-a:no-underline hover:prose-a:underline leading-relaxed text-zinc-300">
-             <ReactMarkdown>{message.content}</ReactMarkdown>
+             <ReactMarkdown
+                components={{
+                  pre: ({ node, ...props }) => {
+                    const codeChild = node?.children[0] as any;
+                    if (codeChild && codeChild.tagName === 'code') {
+                      return <CodeBlock {...props} className={codeChild.properties?.className} />;
+                    }
+                    return <pre {...props} />;
+                  },
+                }}
+             >
+               {message.content}
+             </ReactMarkdown>
+          </div>
+        )}
+
+        {/* Feedback Buttons */}
+        {!isUser && !message.isThinking && (
+          <div className="flex items-center gap-2 mt-3 text-zinc-500">
+            <button
+              onClick={() => onFeedback(message.id, 'like')}
+              className={`flex items-center gap-1.5 p-1 rounded-md transition-colors ${message.feedback === 'like' ? 'text-cyan-400 bg-cyan-500/10' : 'hover:text-zinc-300 hover:bg-zinc-800'}`}
+              aria-label="Like response"
+            >
+              <ThumbsUp size={14} />
+            </button>
+            <button
+              onClick={() => onFeedback(message.id, 'dislike')}
+              className={`flex items-center gap-1.5 p-1 rounded-md transition-colors ${message.feedback === 'dislike' ? 'text-red-400 bg-red-500/10' : 'hover:text-zinc-300 hover:bg-zinc-800'}`}
+              aria-label="Dislike response"
+            >
+              <ThumbsDown size={14} />
+            </button>
           </div>
         )}
       </div>

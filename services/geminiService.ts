@@ -81,7 +81,9 @@ export const generateAnswer = async (
   attachments: Attachment[],
   mode: FocusMode,
   isProMode: boolean,
-  history: { role: string, content: string, parts?: any[] }[]
+  history: { role: string, content: string, parts?: any[] }[],
+  signal?: AbortSignal,
+  proModel?: string
 ): Promise<GeminiResponse> => {
   
   const { instruction, tools } = getSystemInstructionAndTools(mode, isProMode);
@@ -105,8 +107,10 @@ export const generateAnswer = async (
       parts: [{ text: msg.content }]
     }));
 
+    const modelToUse = isProMode && proModel ? proModel : 'gemini-3-pro-preview';
+
     const chat = ai.chats.create({
-        model: 'gemini-3-pro-preview', // Using Gemini 3 Pro Preview
+        model: modelToUse,
         config: chatConfig,
         history: formattedHistory
     });
@@ -139,7 +143,7 @@ export const generateAnswer = async (
     }
 
     // Send message using correct SDK signature: { message: ... }
-    const response = await chat.sendMessage({ message: parts });
+    const response = await chat.sendMessage({ message: parts }, { signal });
 
     // Extract Text
     const text = response.text || "I couldn't generate a text response.";

@@ -6,9 +6,12 @@ import { ChevronDown, Globe, GraduationCap, PenTool, Youtube, MessageCircle } fr
 interface FocusSelectorProps {
   currentMode: FocusMode;
   onSelect: (mode: FocusMode) => void;
+  isProMode: boolean;
+  proModel: string;
+  onProModelChange: (model: string) => void;
 }
 
-export const FocusSelector: React.FC<FocusSelectorProps> = ({ currentMode, onSelect }) => {
+export const FocusSelector: React.FC<FocusSelectorProps> = ({ currentMode, onSelect, isProMode, proModel, onProModelChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +82,27 @@ export const FocusSelector: React.FC<FocusSelectorProps> = ({ currentMode, onSel
               </button>
             ))}
           </div>
+          {isProMode && (
+            <div className="p-1 border-t border-zinc-800">
+                <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    Pro Model
+                </div>
+                <div className="space-y-1">
+                    {['gemini-3-pro-preview', 'gemini-2.5-pro-preview', 'gemini-2.0-pro'].map(model => (
+                        <button
+                            key={model}
+                            onClick={() => {
+                                onProModelChange(model);
+                                setIsOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm rounded-md ${proModel === model ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50'}`}
+                        >
+                            {model.replace('-preview', '')}
+                        </button>
+                    ))}
+                </div>
+            </div>
+          )}
         </div>
       )}
     </div>
