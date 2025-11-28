@@ -33,4 +33,4 @@ export const FOCUS_MODES: FocusModeConfig[] = [
   }
 ];
 
-export const INITIAL_GREETING: string = "Where knowledge begins.";
+export const INITIAL_GREETING: string = "Hello! How can I help you today?";

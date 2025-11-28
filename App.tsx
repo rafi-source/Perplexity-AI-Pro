@@ -9,6 +9,7 @@ import { INITIAL_GREETING } from './constants';
 import { generateAnswer } from './services/geminiService';
 import { fileToBase64, validateFile } from './utils/fileUtils';
 import { ArrowRight, Menu, Paperclip, Plus, Zap } from 'lucide-react';
+import { ToggleSwitch } from './components/ToggleSwitch';
 
 // --- Simulation Scripts ---
 // These define what the "Thinking" process looks like in the UI
@@ -100,6 +101,7 @@ export default function App() {
   // Advanced Settings
   const [focusMode, setFocusMode] = useState<FocusMode>(FocusMode.WEB);
   const [isProMode, setIsProMode] = useState(false);
+  const [proModel, setProModel] = useState('gemini-3-pro-preview');
   
   // Files
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -109,6 +111,7 @@ export default function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const generationController = useRef<AbortController | null>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -244,6 +247,10 @@ export default function App() {
     const tickRate = isProMode ? 1200 : 300; 
 
     const simulationInterval = setInterval(() => {
+        if (generationController.current?.signal.aborted) {
+            clearInterval(simulationInterval);
+            return;
+        }
         setSessions(prev => {
             const sessIdx = prev.findIndex(s => s.id === sessionId);
             if (sessIdx === -1) return prev;
@@ -299,6 +306,7 @@ export default function App() {
     }, tickRate);
 
     try {
+        generationController.current = new AbortController();
       // Call API
       const history = updatedSessions[sessionIndex].messages
         .filter(m => !m.isThinking)
@@ -309,8 +317,12 @@ export default function App() {
           userMsg.attachments || [], 
           focusMode, 
           isProMode, 
-          history
+          history,
+          generationController.current.signal,
+          proModel
       );
+
+      if (generationController.current?.signal.aborted) return;
 
       // Finalize Session with real data
       setSessions(prev => {
@@ -346,23 +358,49 @@ export default function App() {
 
     } catch (err) {
       console.error(err);
-      setSessions(prev => {
-        const newSessions = [...prev];
-        const idx = newSessions.findIndex(s => s.id === sessionId);
-        if (idx !== -1) {
-             newSessions[idx].messages.pop();
-             newSessions[idx].messages.push({
-                 id: generateId(),
-                 role: 'assistant',
-                 content: "I encountered an error while processing. Please try again.",
-                 timestamp: Date.now()
-             });
-        }
-        return newSessions;
-      });
+      if ((err as Error).name === 'AbortError') {
+        console.log('Generation stopped by user.');
+        // Optionally, update the UI to show that the generation was stopped
+        setSessions(prev => {
+            const newSessions = [...prev];
+            const idx = newSessions.findIndex(s => s.id === sessionId);
+            if (idx !== -1) {
+                newSessions[idx].messages.pop(); // Remove the thinking message
+                newSessions[idx].messages.push({
+                    id: generateId(),
+                    role: 'assistant',
+                    content: "Generation stopped.",
+                    timestamp: Date.now()
+                });
+            }
+            return newSessions;
+        });
+      } else {
+        setSessions(prev => {
+            const newSessions = [...prev];
+            const idx = newSessions.findIndex(s => s.id === sessionId);
+            if (idx !== -1) {
+                newSessions[idx].messages.pop();
+                newSessions[idx].messages.push({
+                    id: generateId(),
+                    role: 'assistant',
+                    content: "I encountered an error while processing. Please try again.",
+                    timestamp: Date.now()
+                });
+            }
+            return newSessions;
+        });
+      }
     } finally {
       clearInterval(simulationInterval);
       setIsGenerating(false);
+      generationController.current = null;
+    }
+  };
+
+  const handleStopGenerating = () => {
+    if (generationController.current) {
+      generationController.current.abort();
     }
   };
 
@@ -373,6 +411,25 @@ export default function App() {
     if (activeSessionId === id) {
       setActiveSessionId(null);
     }
+  };
+
+  const handleFeedback = (messageId: string, feedback: 'like' | 'dislike') => {
+    if (!activeSessionId) return;
+
+    setSessions(prev => prev.map(session => {
+      if (session.id === activeSessionId) {
+        const updatedMessages = session.messages.map(msg => {
+          if (msg.id === messageId) {
+            // If the same feedback is clicked again, reset it to null
+            const newFeedback = msg.feedback === feedback ? null : feedback;
+            return { ...msg, feedback: newFeedback };
+          }
+          return msg;
+        });
+        return { ...session, messages: updatedMessages };
+      }
+      return session;
+    }));
   };
 
   return (
@@ -414,7 +471,7 @@ export default function App() {
 
           <div className="max-w-3xl mx-auto px-4 md:px-8 pt-8 pb-32">
             {currentMessages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble key={msg.id} message={msg} onFeedback={handleFeedback} />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -423,21 +480,36 @@ export default function App() {
         {/* Input Area - Fixed at bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent pt-10 z-20">
           <div className="max-w-3xl mx-auto">
+            {isGenerating && (
+                <div className="flex justify-center mb-2">
+                    <button
+                        onClick={handleStopGenerating}
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-full text-sm text-zinc-300 hover:bg-zinc-700 transition-colors"
+                    >
+                        <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                        Stop Generating
+                    </button>
+                </div>
+            )}
             <div className="relative group">
               
               {/* Toolbar Row */}
               <div className="absolute bottom-full left-0 mb-3 ml-1 flex items-center gap-3">
-                <FocusSelector currentMode={focusMode} onSelect={setFocusMode} />
+                <FocusSelector
+                    currentMode={focusMode}
+                    onSelect={setFocusMode}
+                    isProMode={isProMode}
+                    proModel={proModel}
+                    onProModelChange={setProModel}
+                />
                 
                 {/* Pro Mode Toggle */}
-                <button 
-                    onClick={() => setIsProMode(!isProMode)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border transition-all duration-300 ${isProMode ? 'bg-blue-600/10 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-zinc-800/50 border-zinc-700 text-zinc-500 hover:border-zinc-600'}`}
-                >
-                    <Zap size={12} className={isProMode ? "fill-current" : ""} />
-                    Deep Research
-                    <div className={`w-2 h-2 rounded-full ${isProMode ? 'bg-blue-400 animate-pulse' : 'bg-zinc-600'}`} />
-                </button>
+                <ToggleSwitch
+                    isChecked={isProMode}
+                    onChange={setIsProMode}
+                    label="Deep Research"
+                    icon={<Zap size={12} className={isProMode ? "fill-current" : ""} />}
+                />
               </div>
 
               <form 

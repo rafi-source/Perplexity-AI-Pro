@@ -28,6 +28,7 @@ export interface Message {
   thinkingSteps?: ThinkingStep[];
   timestamp: number;
   isProMode?: boolean; // Visual indicator for Pro answers
+  feedback?: 'like' | 'dislike' | null;
 }
 
 export interface ChatSession {
