@@ -10,6 +10,7 @@ import { generateAnswer } from './services/geminiService';
 import { fileToBase64, validateFile } from './utils/fileUtils';
 import { ArrowRight, Menu, Paperclip, Plus, Zap } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
+import { Helmet } from 'react-helmet-async';
 
 // --- Simulation Scripts ---
 // These define what the "Thinking" process looks like in the UI
@@ -433,7 +434,13 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-background text-white overflow-hidden font-sans selection:bg-cyan-500/30">
+    <>
+      <Helmet>
+        <title>{activeSession ? `${activeSession.title} - AI Assistant` : 'Advanced AI Research Assistant'}</title>
+        {/* Add your production URL here */}
+        <link rel="canonical" href="https://your-production-url-goes-here.com/" />
+      </Helmet>
+      <div className="flex h-screen bg-background text-white overflow-hidden font-sans selection:bg-cyan-500/30">
       <Sidebar 
         sessions={sessions} 
         activeSessionId={activeSessionId} 
@@ -590,5 +597,6 @@ export default function App() {
 
       </main>
     </div>
+    </>
   );
 }
